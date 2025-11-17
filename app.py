@@ -79,12 +79,14 @@ class TravelAnalyzer:
         self.journeys = journeys
         
     def estimate_distance(self, start, end):
-        """Estimate distance between two locations using available data"""
-        # Clean and normalize location names
+        """Estimate distance between two locations using Nominatim geocoding and OSRM routing"""
+        import requests
+        import time
+        
+        # First try hardcoded database for speed
         start_clean = start.strip().replace(' ', '_')
         end_clean = end.strip().replace(' ', '_')
         
-        # Try direct lookup
         key1 = f"{start_clean}_to_{end_clean}"
         key2 = f"{end_clean}_to_{start_clean}"
         
@@ -93,31 +95,81 @@ class TravelAnalyzer:
         elif key2 in DISTANCE_DATABASE:
             return DISTANCE_DATABASE[key2]
         
-        # Try partial matching for airports
-        if 'airport' in start.lower() and 'hotel' in end.lower():
-            return DISTANCE_DATABASE.get('Airport_to_City_Hotel', 10)
-        elif 'hotel' in start.lower() and 'airport' in end.lower():
-            return DISTANCE_DATABASE.get('Airport_to_City_Hotel', 10)
+        # Try intelligent estimation using free APIs
+        try:
+            # Geocode start location
+            geocode_url = "https://nominatim.openstreetmap.org/search"
+            headers = {'User-Agent': 'CorkChoralCarbonCalculator/1.0'}
             
-        # Try matching for common venue types
+            start_response = requests.get(
+                geocode_url,
+                params={'q': start, 'format': 'json', 'limit': 1},
+                headers=headers,
+                timeout=5
+            )
+            time.sleep(1)  # Rate limiting - be nice to free service
+            
+            end_response = requests.get(
+                geocode_url,
+                params={'q': end, 'format': 'json', 'limit': 1},
+                headers=headers,
+                timeout=5
+            )
+            
+            if start_response.status_code == 200 and end_response.status_code == 200:
+                start_data = start_response.json()
+                end_data = end_response.json()
+                
+                if start_data and end_data:
+                    start_lat = float(start_data[0]['lat'])
+                    start_lon = float(start_data[0]['lon'])
+                    end_lat = float(end_data[0]['lat'])
+                    end_lon = float(end_data[0]['lon'])
+                    
+                    # Use OSRM for routing distance
+                    osrm_url = f"https://router.project-osrm.org/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}"
+                    route_response = requests.get(
+                        osrm_url,
+                        params={'overview': 'false'},
+                        timeout=5
+                    )
+                    
+                    if route_response.status_code == 200:
+                        route_data = route_response.json()
+                        if route_data.get('routes'):
+                            # Distance in meters, convert to km
+                            distance_km = route_data['routes'][0]['distance'] / 1000
+                            return round(distance_km, 1)
+        
+        except Exception as e:
+            # If API fails, fall back to pattern matching
+            pass
+        
+        # Fallback: Pattern matching for airports
+        if 'airport' in start.lower() and ('hotel' in end.lower() or 'city' in end.lower()):
+            return 10
+        elif 'hotel' in start.lower() and 'airport' in end.lower():
+            return 10
+            
+        # Venue type matching
         venue_patterns = {
-            'concert_hall': 'Hotel_to_Concert_Hall',
-            'church': 'Hotel_to_Church',
-            'community': 'Hotel_to_Community_Centre',
-            'centre': 'Hotel_to_Community_Centre',
-            'college': 'Hotel_to_Community_Centre',
+            'concert_hall': 5,
+            'church': 7,
+            'community': 15,
+            'centre': 15,
+            'college': 15,
         }
         
-        for pattern, key in venue_patterns.items():
+        for pattern, distance in venue_patterns.items():
             if pattern in end.lower() and 'hotel' in start.lower():
-                return DISTANCE_DATABASE.get(key, 10)
+                return distance
         
         # Check if it's international flight
         countries = ['germany', 'france', 'spain', 'italy', 'uk', 'poland', 
                     'czech', 'austria', 'netherlands', 'belgium', 'portugal']
         if any(country in start.lower() for country in countries):
-            if 'cork' in end.lower():
-                return 1500  # Average European flight to Cork
+            if 'cork' in end.lower() or 'ireland' in end.lower():
+                return 1500  # Average European flight
         
         # Default estimates based on context
         if 'airport' in start.lower() or 'airport' in end.lower():
@@ -125,7 +177,7 @@ class TravelAnalyzer:
         elif any(x in start.lower() or x in end.lower() for x in ['dublin', 'galway', 'limerick']):
             return 150  # Irish inter-city
         else:
-            return 15  # Local Cork area
+            return 15  # Local area
     
     def calculate_emissions(self, distance, transport_mode):
         """Calculate CO2 emissions for a journey"""
