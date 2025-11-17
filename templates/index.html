@@ -112,118 +112,36 @@
                 </div>
             </div>
 
-            <!-- Optimisation Scenarios -->
+            <!-- Efficiency Rating -->
             <div class="card">
-                <h3>🌱 Optimisation Scenarios</h3>
-                <p class="section-description">Compare different transport options to reduce your carbon footprint</p>
+                <h3>🎯 Carbon Efficiency Rating</h3>
                 
-                <!-- Scenario Tabs -->
-                <div class="scenario-tabs">
-                    <button class="scenario-tab active" onclick="showScenario('green')">
-                        <span class="tab-icon">🌿</span> Green Option
-                    </button>
-                    <button class="scenario-tab" onclick="showScenario('balanced')">
-                        <span class="tab-icon">⚖️</span> Balanced Approach
-                    </button>
-                    <button class="scenario-tab" onclick="showScenario('flexible')">
-                        <span class="tab-icon">🚗</span> Flexible Option
-                    </button>
+                <!-- Big Efficiency Badge -->
+                <div class="efficiency-badge" id="efficiency-badge">
+                    <div class="rating-score" id="rating-score">0%</div>
+                    <div class="rating-grade" id="rating-grade">-</div>
+                    <div class="rating-label" id="rating-label">Calculating...</div>
                 </div>
 
-                <!-- Green Scenario -->
-                <div id="scenario-green" class="scenario-content">
-                    <div class="scenario-header">
-                        <h4 id="green-title">Green Option</h4>
-                        <p id="green-description" class="scenario-description"></p>
-                    </div>
-                    
-                    <div class="metrics-row">
-                        <div class="metric-card positive">
-                            <div class="metric-value" id="green-saving">0 kg</div>
-                            <div class="metric-label">CO₂ Saved</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="green-cost">0%</div>
-                            <div class="metric-label">Cost Impact</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="green-convenience">0%</div>
-                            <div class="metric-label">Convenience</div>
-                        </div>
-                    </div>
-
-                    <div class="chart-container">
-                        <img id="green-chart" src="" alt="Green scenario comparison">
-                    </div>
-
-                    <div class="actions-section">
-                        <h5>📋 Recommended Actions:</h5>
-                        <ul id="green-actions" class="action-list"></ul>
-                    </div>
+                <div class="efficiency-explanation">
+                    <p id="efficiency-text">You operated at <strong id="efficiency-percent">0%</strong> of optimal efficiency for this trip.</p>
                 </div>
 
-                <!-- Balanced Scenario -->
-                <div id="scenario-balanced" class="scenario-content" style="display: none;">
-                    <div class="scenario-header">
-                        <h4 id="balanced-title">Balanced Approach</h4>
-                        <p id="balanced-description" class="scenario-description"></p>
-                    </div>
-                    
-                    <div class="metrics-row">
-                        <div class="metric-card positive">
-                            <div class="metric-value" id="balanced-saving">0 kg</div>
-                            <div class="metric-label">CO₂ Saved</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="balanced-cost">0%</div>
-                            <div class="metric-label">Cost Impact</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="balanced-convenience">0%</div>
-                            <div class="metric-label">Convenience</div>
-                        </div>
-                    </div>
-
-                    <div class="chart-container">
-                        <img id="balanced-chart" src="" alt="Balanced scenario comparison">
-                    </div>
-
-                    <div class="actions-section">
-                        <h5>📋 Recommended Actions:</h5>
-                        <ul id="balanced-actions" class="action-list"></ul>
-                    </div>
+                <!-- Comparison Chart -->
+                <div class="chart-container">
+                    <img id="comparison-chart" src="" alt="Your Trip vs Optimised comparison">
                 </div>
 
-                <!-- Flexible Scenario -->
-                <div id="scenario-flexible" class="scenario-content" style="display: none;">
-                    <div class="scenario-header">
-                        <h4 id="flexible-title">Flexible Option</h4>
-                        <p id="flexible-description" class="scenario-description"></p>
-                    </div>
-                    
-                    <div class="metrics-row">
-                        <div class="metric-card negative">
-                            <div class="metric-value" id="flexible-saving">0 kg</div>
-                            <div class="metric-label">CO₂ Impact</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="flexible-cost">0%</div>
-                            <div class="metric-label">Cost Impact</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="flexible-convenience">0%</div>
-                            <div class="metric-label">Convenience</div>
-                        </div>
-                    </div>
+                <!-- What You Did Well -->
+                <div class="good-choices-section">
+                    <h4>✅ What Worked Well:</h4>
+                    <ul id="good-choices-list" class="choice-list"></ul>
+                </div>
 
-                    <div class="chart-container">
-                        <img id="flexible-chart" src="" alt="Flexible scenario comparison">
-                    </div>
-
-                    <div class="actions-section">
-                        <h5>📋 What This Means:</h5>
-                        <ul id="flexible-actions" class="action-list"></ul>
-                    </div>
+                <!-- Future Improvements -->
+                <div class="improvements-section">
+                    <h4>🌱 For Future Trips, Consider:</h4>
+                    <ul id="improvements-list" class="improvement-list"></ul>
                 </div>
             </div>
 
@@ -409,40 +327,60 @@
             document.getElementById('car-equivalent').textContent = data.summary.car_equivalent;
             document.getElementById('trees-needed').textContent = data.summary.trees_needed;
 
-            // Update scenarios
-            ['green', 'balanced', 'flexible'].forEach(key => {
-                const scenario = data.scenarios[key];
-                const prefix = key;
-                
-                document.getElementById(`${prefix}-description`).textContent = scenario.description;
-                document.getElementById(`${prefix}-saving`).textContent = 
-                    (scenario.saving >= 0 ? '-' : '+') + Math.abs(scenario.saving).toFixed(0) + ' kg (' + 
-                    Math.abs(scenario.saving_pct).toFixed(0) + '%)';
-                document.getElementById(`${prefix}-cost`).textContent = 
-                    (scenario.cost_index - 100 >= 0 ? '+' : '') + (scenario.cost_index - 100) + '%';
-                document.getElementById(`${prefix}-convenience`).textContent = scenario.convenience + '%';
-                
-                document.getElementById(`${prefix}-chart`).src = 'data:image/png;base64,' + data.charts[key];
-                
-                const actionsList = document.getElementById(`${prefix}-actions`);
-                actionsList.innerHTML = '';
-                scenario.actions.forEach(action => {
-                    const li = document.createElement('li');
-                    li.textContent = action;
-                    actionsList.appendChild(li);
-                });
+            // Update efficiency rating
+            const efficiency = data.scenarios.efficiency;
+            const badge = document.getElementById('efficiency-badge');
+            
+            document.getElementById('rating-score').textContent = efficiency.score.toFixed(0) + '%';
+            document.getElementById('rating-grade').textContent = efficiency.rating;
+            document.getElementById('rating-label').textContent = efficiency.rating_label;
+            document.getElementById('efficiency-percent').textContent = efficiency.score.toFixed(0) + '%';
+            
+            // Set badge color based on rating
+            badge.style.borderColor = efficiency.rating_color;
+            document.getElementById('rating-grade').style.color = efficiency.rating_color;
+            
+            // Update efficiency explanation
+            if (efficiency.savings_potential > 0) {
+                document.getElementById('efficiency-text').innerHTML = 
+                    `You operated at <strong>${efficiency.score.toFixed(0)}%</strong> of optimal efficiency. ` +
+                    `With better transport choices, you could have saved <strong>${efficiency.savings_potential.toFixed(0)} kg CO₂</strong>.`;
+            } else {
+                document.getElementById('efficiency-text').innerHTML = 
+                    `Outstanding! You operated at <strong>${efficiency.score.toFixed(0)}%</strong> efficiency. ` +
+                    `You're already using the most carbon-efficient transport options.`;
+            }
+            
+            // Update comparison chart
+            document.getElementById('comparison-chart').src = 'data:image/png;base64,' + data.chart;
+            
+            // Update good choices list
+            const goodChoicesList = document.getElementById('good-choices-list');
+            goodChoicesList.innerHTML = '';
+            efficiency.good_choices.forEach(choice => {
+                const li = document.createElement('li');
+                li.textContent = choice;
+                goodChoicesList.appendChild(li);
             });
+            
+            // Update improvements list
+            const improvementsList = document.getElementById('improvements-list');
+            improvementsList.innerHTML = '';
+            if (efficiency.improvements && efficiency.improvements.length > 0) {
+                efficiency.improvements.forEach(improvement => {
+                    const li = document.createElement('li');
+                    li.textContent = improvement;
+                    improvementsList.appendChild(li);
+                });
+            } else {
+                const li = document.createElement('li');
+                li.textContent = 'You\'re already at optimal efficiency! No improvements needed.';
+                li.style.fontStyle = 'italic';
+                improvementsList.appendChild(li);
+            }
 
             document.getElementById('results').style.display = 'block';
             document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function showScenario(scenario) {
-            document.querySelectorAll('.scenario-tab').forEach(tab => tab.classList.remove('active'));
-            event.target.closest('.scenario-tab').classList.add('active');
-            
-            document.querySelectorAll('.scenario-content').forEach(content => content.style.display = 'none');
-            document.getElementById(`scenario-${scenario}`).style.display = 'block';
         }
 
         // File upload handling
