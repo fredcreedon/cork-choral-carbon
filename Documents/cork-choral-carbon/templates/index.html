@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cork Choral Festival - Carbon Calculator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Cork International Choral Festival</h1>
+            <h2>Travel Carbon Calculator</h2>
+            <p class="subtitle">Analyse your team's travel emissions and explore optimisation opportunities</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="card">
+            <h3>📊 Enter Travel Data</h3>
+            
+            <!-- Tab Selection for Input Method -->
+            <div class="input-tabs">
+                <button class="tab-button active" onclick="showInputMethod('manual', this)">Manual Entry</button>
+                <button class="tab-button" onclick="showInputMethod('upload', this)">Upload Excel File</button>
+            </div>
+
+            <!-- Manual Entry Form -->
+            <div id="manual-input" class="input-method">
+                <div class="form-group">
+                    <label for="team_name">Team Name:</label>
+                    <input type="text" id="team_name" placeholder="e.g., Competitive Team 1" value="Competitive Team 1">
+                </div>
+
+                <div class="form-group">
+                    <label for="num_people">Number of People:</label>
+                    <input type="number" id="num_people" placeholder="35" value="35" min="1">
+                </div>
+
+                <div class="journeys-container" id="journeys-container">
+                    <h4>Journey Segments</h4>
+                    <p class="help-hint">💡 Tip: Leave distance blank to auto-estimate based on locations</p>
+                    <div class="journey-item">
+                        <input type="text" class="journey-event" placeholder="Event (e.g., Arrival in Ireland)">
+                        <input type="text" class="journey-start" placeholder="Start point (e.g., Frankfurt)" onchange="estimateDistance(this)">
+                        <input type="text" class="journey-end" placeholder="End point (e.g., Cork Airport)" onchange="estimateDistance(this)">
+                        <input type="text" class="journey-date" placeholder="Date (DD/MM/YYYY)">
+                        <select class="journey-transport">
+                            <option value="airplane">Airplane</option>
+                            <option value="festival bus">Festival Bus</option>
+                            <option value="public bus">Public Bus</option>
+                            <option value="car">Car</option>
+                            <option value="train">Train</option>
+                        </select>
+                        <input type="number" class="journey-distance" placeholder="Distance (km) or leave blank" step="0.1">
+                        <button type="button" class="btn-remove" onclick="removeJourney(this)">✕</button>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-secondary" onclick="addJourney()">+ Add Journey</button>
+                <button type="button" class="btn-primary" onclick="analyzeManual()">Calculate Emissions</button>
+            </div>
+
+            <!-- File Upload Form -->
+            <div id="upload-input" class="input-method" style="display: none;">
+                <div class="upload-area" id="upload-area">
+                    <input type="file" id="file-input" accept=".xlsx,.xls" style="display: none;">
+                    <div class="upload-content">
+                        <p>📄 Drag and drop your Excel file here</p>
+                        <p class="upload-hint">or click to browse</p>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('file-input').click()">Choose File</button>
+                    </div>
+                </div>
+                <div id="file-preview" style="display: none;">
+                    <p><strong>Selected file:</strong> <span id="file-name"></span></p>
+                    <button type="button" class="btn-primary" onclick="uploadFile()">Upload & Analyze</button>
+                </div>
+                <div class="help-text">
+                    <p><strong>Excel Format:</strong> Columns should include: Event, Starting Point, Arrival Point, Date, Transportation</p>
+                    <p>First row header should contain: Team Name, Number of people</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" style="display: none;" class="loading">
+            <div class="spinner"></div>
+            <p>Calculating emissions...</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" style="display: none;">
+            <!-- Summary Card -->
+            <div class="card">
+                <h3>📈 Carbon Footprint Summary</h3>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-value" id="total-emissions">0</div>
+                        <div class="summary-label">Total kg CO₂</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="per-person-emissions">0</div>
+                        <div class="summary-label">kg CO₂ per person</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="car-equivalent">0</div>
+                        <div class="summary-label">km car equivalent</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="trees-needed">0</div>
+                        <div class="summary-label">trees to offset</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optimisation Scenarios -->
+            <div class="card">
+                <h3>🌱 Optimisation Scenarios</h3>
+                <p class="section-description">Compare different transport options to reduce your carbon footprint</p>
+                
+                <!-- Scenario Tabs -->
+                <div class="scenario-tabs">
+                    <button class="scenario-tab active" onclick="showScenario('green')">
+                        <span class="tab-icon">🌿</span> Green Option
+                    </button>
+                    <button class="scenario-tab" onclick="showScenario('balanced')">
+                        <span class="tab-icon">⚖️</span> Balanced Approach
+                    </button>
+                    <button class="scenario-tab" onclick="showScenario('flexible')">
+                        <span class="tab-icon">🚗</span> Flexible Option
+                    </button>
+                </div>
+
+                <!-- Green Scenario -->
+                <div id="scenario-green" class="scenario-content">
+                    <div class="scenario-header">
+                        <h4 id="green-title">Green Option</h4>
+                        <p id="green-description" class="scenario-description"></p>
+                    </div>
+                    
+                    <div class="metrics-row">
+                        <div class="metric-card positive">
+                            <div class="metric-value" id="green-saving">0 kg</div>
+                            <div class="metric-label">CO₂ Saved</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="green-cost">0%</div>
+                            <div class="metric-label">Cost Impact</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="green-convenience">0%</div>
+                            <div class="metric-label">Convenience</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <img id="green-chart" src="" alt="Green scenario comparison">
+                    </div>
+
+                    <div class="actions-section">
+                        <h5>📋 Recommended Actions:</h5>
+                        <ul id="green-actions" class="action-list"></ul>
+                    </div>
+                </div>
+
+                <!-- Balanced Scenario -->
+                <div id="scenario-balanced" class="scenario-content" style="display: none;">
+                    <div class="scenario-header">
+                        <h4 id="balanced-title">Balanced Approach</h4>
+                        <p id="balanced-description" class="scenario-description"></p>
+                    </div>
+                    
+                    <div class="metrics-row">
+                        <div class="metric-card positive">
+                            <div class="metric-value" id="balanced-saving">0 kg</div>
+                            <div class="metric-label">CO₂ Saved</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="balanced-cost">0%</div>
+                            <div class="metric-label">Cost Impact</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="balanced-convenience">0%</div>
+                            <div class="metric-label">Convenience</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <img id="balanced-chart" src="" alt="Balanced scenario comparison">
+                    </div>
+
+                    <div class="actions-section">
+                        <h5>📋 Recommended Actions:</h5>
+                        <ul id="balanced-actions" class="action-list"></ul>
+                    </div>
+                </div>
+
+                <!-- Flexible Scenario -->
+                <div id="scenario-flexible" class="scenario-content" style="display: none;">
+                    <div class="scenario-header">
+                        <h4 id="flexible-title">Flexible Option</h4>
+                        <p id="flexible-description" class="scenario-description"></p>
+                    </div>
+                    
+                    <div class="metrics-row">
+                        <div class="metric-card negative">
+                            <div class="metric-value" id="flexible-saving">0 kg</div>
+                            <div class="metric-label">CO₂ Impact</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="flexible-cost">0%</div>
+                            <div class="metric-label">Cost Impact</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="flexible-convenience">0%</div>
+                            <div class="metric-label">Convenience</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <img id="flexible-chart" src="" alt="Flexible scenario comparison">
+                    </div>
+
+                    <div class="actions-section">
+                        <h5>📋 What This Means:</h5>
+                        <ul id="flexible-actions" class="action-list"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Options -->
+            <div class="card">
+                <h3>💾 Export Results</h3>
+                <button type="button" class="btn-secondary" onclick="window.print()">📄 Print Report</button>
+                <button type="button" class="btn-secondary" onclick="alert('Download feature coming soon!')">📊 Download as PDF</button>
+            </div>
+        </div>
+
+        <footer>
+            <p>Cork International Choral Festival • Carbon Calculator v1.0</p>
+            <p class="footer-note">Emission factors based on DEFRA 2024 guidelines</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentData = null;
+        
+        // Distance estimation database (client-side)
+        const distanceDB = {
+            'cork_airport_to_cork_city': 8,
+            'cork_airport_to_city_centre': 8,
+            'germany_to_cork': 1450,
+            'berlin_to_cork': 1800,
+            'munich_to_cork': 1600,
+            'frankfurt_to_cork': 1450,
+            'london_to_cork': 600,
+            'paris_to_cork': 850,
+            'amsterdam_to_cork': 1100,
+            'dublin_to_cork': 265,
+            'galway_to_cork': 210,
+            'limerick_to_cork': 100
+        };
+        
+        function estimateDistance(input) {
+            const journeyItem = input.closest('.journey-item');
+            const startInput = journeyItem.querySelector('.journey-start');
+            const endInput = journeyItem.querySelector('.journey-end');
+            const distanceInput = journeyItem.querySelector('.journey-distance');
+            
+            // Only estimate if distance is empty
+            if (distanceInput.value) return;
+            
+            const start = startInput.value.trim().toLowerCase();
+            const end = endInput.value.trim().toLowerCase();
+            
+            if (!start || !end) return;
+            
+            // Clean location names
+            const startClean = start.replace(/\s+/g, '_');
+            const endClean = end.replace(/\s+/g, '_');
+            
+            // Try direct lookup
+            let key = `${startClean}_to_${endClean}`;
+            if (distanceDB[key]) {
+                distanceInput.value = distanceDB[key];
+                distanceInput.style.backgroundColor = '#e8f5e9';
+                return;
+            }
+            
+            // Try reverse
+            key = `${endClean}_to_${startClean}`;
+            if (distanceDB[key]) {
+                distanceInput.value = distanceDB[key];
+                distanceInput.style.backgroundColor = '#e8f5e9';
+                return;
+            }
+            
+            // Pattern matching for airports
+            if (start.includes('airport') && (end.includes('hotel') || end.includes('city'))) {
+                distanceInput.value = 10;
+                distanceInput.style.backgroundColor = '#fff3cd';
+                distanceInput.title = 'Estimated - typical airport transfer';
+                return;
+            }
+            
+            // European cities
+            const europeanCities = ['germany', 'france', 'spain', 'italy', 'poland', 'czech', 
+                                   'austria', 'netherlands', 'belgium', 'berlin', 'paris', 
+                                   'madrid', 'rome', 'warsaw', 'prague', 'vienna'];
+            
+            if (europeanCities.some(city => start.includes(city)) && end.includes('cork')) {
+                distanceInput.value = 1500;
+                distanceInput.style.backgroundColor = '#fff3cd';
+                distanceInput.title = 'Estimated - average European flight';
+                return;
+            }
+            
+            // Show hint that manual entry is needed
+            distanceInput.placeholder = 'Enter distance manually';
+            distanceInput.style.borderColor = '#ff9800';
+        }
+
+        let selectedFile = null; // Store the selected file globally
+
+        function showInputMethod(method, clickedButton) {
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            } else if (event && event.target) {
+                event.target.classList.add('active');
+            }
+            
+            document.getElementById('manual-input').style.display = method === 'manual' ? 'block' : 'none';
+            document.getElementById('upload-input').style.display = method === 'upload' ? 'block' : 'none';
+        }
+
+        function addJourney() {
+            const container = document.getElementById('journeys-container');
+            const template = container.querySelector('.journey-item').cloneNode(true);
+            template.querySelectorAll('input, select').forEach(input => input.value = '');
+            container.appendChild(template);
+        }
+
+        function removeJourney(button) {
+            const container = document.getElementById('journeys-container');
+            if (container.querySelectorAll('.journey-item').length > 1) {
+                button.closest('.journey-item').remove();
+            }
+        }
+
+        async function analyzeManual() {
+            const teamName = document.getElementById('team_name').value;
+            const numPeople = parseInt(document.getElementById('num_people').value);
+            
+            const journeys = [];
+            document.querySelectorAll('.journey-item').forEach(item => {
+                const event = item.querySelector('.journey-event').value;
+                const start = item.querySelector('.journey-start').value;
+                const end = item.querySelector('.journey-end').value;
+                const date = item.querySelector('.journey-date').value;
+                const transport = item.querySelector('.journey-transport').value;
+                const distance = parseFloat(item.querySelector('.journey-distance').value);
+                
+                if (event && start && end && distance) {
+                    journeys.push({
+                        event, start_point: start, arrival_point: end,
+                        date, transport_mode: transport, distance
+                    });
+                }
+            });
+
+            if (journeys.length === 0) {
+                alert('Please add at least one journey with all required fields');
+                return;
+            }
+
+            await analyze({ team_name: teamName, num_people: numPeople, journeys });
+        }
+
+        async function analyze(data) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentData = result;
+                    displayResults(result);
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error analyzing data: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            // Update summary
+            document.getElementById('total-emissions').textContent = data.summary.total_emissions;
+            document.getElementById('per-person-emissions').textContent = data.summary.emissions_per_person;
+            document.getElementById('car-equivalent').textContent = data.summary.car_equivalent;
+            document.getElementById('trees-needed').textContent = data.summary.trees_needed;
+
+            // Update scenarios
+            ['green', 'balanced', 'flexible'].forEach(key => {
+                const scenario = data.scenarios[key];
+                const prefix = key;
+                
+                document.getElementById(`${prefix}-description`).textContent = scenario.description;
+                document.getElementById(`${prefix}-saving`).textContent = 
+                    (scenario.saving >= 0 ? '-' : '+') + Math.abs(scenario.saving).toFixed(0) + ' kg (' + 
+                    Math.abs(scenario.saving_pct).toFixed(0) + '%)';
+                document.getElementById(`${prefix}-cost`).textContent = 
+                    (scenario.cost_index - 100 >= 0 ? '+' : '') + (scenario.cost_index - 100) + '%';
+                document.getElementById(`${prefix}-convenience`).textContent = scenario.convenience + '%';
+                
+                document.getElementById(`${prefix}-chart`).src = 'data:image/png;base64,' + data.charts[key];
+                
+                const actionsList = document.getElementById(`${prefix}-actions`);
+                actionsList.innerHTML = '';
+                scenario.actions.forEach(action => {
+                    const li = document.createElement('li');
+                    li.textContent = action;
+                    actionsList.appendChild(li);
+                });
+            });
+
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showScenario(scenario) {
+            document.querySelectorAll('.scenario-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.closest('.scenario-tab').classList.add('active');
+            
+            document.querySelectorAll('.scenario-content').forEach(content => content.style.display = 'none');
+            document.getElementById(`scenario-${scenario}`).style.display = 'block';
+        }
+
+        // File upload handling
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        let selectedFile = null; // Store the selected file globally
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            handleFileSelect(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            handleFileSelect(file);
+        });
+
+        function handleFileSelect(file) {
+            if (file) {
+                selectedFile = file; // Store the file globally
+                document.getElementById('file-name').textContent = file.name;
+                document.getElementById('file-preview').style.display = 'block';
+            }
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) {
+                alert('Please select a file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    await analyze({
+                        team_name: result.team_name,
+                        num_people: result.num_people,
+                        journeys: result.journeys
+                    });
+                } else {
+                    alert('Error uploading file: ' + result.error);
+                    document.getElementById('loading').style.display = 'none';
+                }
+            } catch (error) {
+                alert('Error uploading file: ' + error.message);
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
