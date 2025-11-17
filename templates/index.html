@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,8 +21,8 @@
             
             <!-- Tab Selection for Input Method -->
             <div class="input-tabs">
-                <button class="tab-button active" onclick="showInputMethod('manual', this)">Manual Entry</button>
-                <button class="tab-button" onclick="showInputMethod('upload', this)">Upload Excel File</button>
+                <button class="tab-button active" onclick="showInputMethod('manual')">Manual Entry</button>
+                <button class="tab-button" onclick="showInputMethod('upload')">Upload Excel File</button>
             </div>
 
             <!-- Manual Entry Form -->
@@ -321,13 +322,9 @@
 
         let selectedFile = null; // Store the selected file globally
 
-        function showInputMethod(method, clickedButton) {
+        function showInputMethod(method) {
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            if (clickedButton) {
-                clickedButton.classList.add('active');
-            } else if (event && event.target) {
-                event.target.classList.add('active');
-            }
+            event.target.classList.add('active');
             
             document.getElementById('manual-input').style.display = method === 'manual' ? 'block' : 'none';
             document.getElementById('upload-input').style.display = method === 'upload' ? 'block' : 'none';
