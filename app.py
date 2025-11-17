@@ -133,55 +133,14 @@ class TravelAnalyzer:
         elif key2 in DISTANCE_DATABASE:
             return DISTANCE_DATABASE[key2]
         
+        # DISABLED: API calls cause timeout on free tier
         # Try intelligent estimation using free APIs
-        try:
-            # Geocode start location
-            geocode_url = "https://nominatim.openstreetmap.org/search"
-            headers = {'User-Agent': 'CorkChoralCarbonCalculator/1.0'}
-            
-            start_response = requests.get(
-                geocode_url,
-                params={'q': start, 'format': 'json', 'limit': 1},
-                headers=headers,
-                timeout=5
-            )
-            time.sleep(1)  # Rate limiting - be nice to free service
-            
-            end_response = requests.get(
-                geocode_url,
-                params={'q': end, 'format': 'json', 'limit': 1},
-                headers=headers,
-                timeout=5
-            )
-            
-            if start_response.status_code == 200 and end_response.status_code == 200:
-                start_data = start_response.json()
-                end_data = end_response.json()
-                
-                if start_data and end_data:
-                    start_lat = float(start_data[0]['lat'])
-                    start_lon = float(start_data[0]['lon'])
-                    end_lat = float(end_data[0]['lat'])
-                    end_lon = float(end_data[0]['lon'])
-                    
-                    # Use OSRM for routing distance
-                    osrm_url = f"https://router.project-osrm.org/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}"
-                    route_response = requests.get(
-                        osrm_url,
-                        params={'overview': 'false'},
-                        timeout=5
-                    )
-                    
-                    if route_response.status_code == 200:
-                        route_data = route_response.json()
-                        if route_data.get('routes'):
-                            # Distance in meters, convert to km
-                            distance_km = route_data['routes'][0]['distance'] / 1000
-                            return round(distance_km, 1)
-        
-        except Exception as e:
-            # If API fails, fall back to pattern matching
-            pass
+        # try:
+        #     # Geocode start location
+        #     geocode_url = "https://nominatim.openstreetmap.org/search"
+        #     ...
+        # except Exception as e:
+        #     pass
         
         # Fallback: Pattern matching for airports
         if 'airport' in start.lower() and ('hotel' in end.lower() or 'city' in end.lower()):
