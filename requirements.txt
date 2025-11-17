@@ -6,3 +6,4 @@ numpy==1.24.3
 seaborn==0.12.2
 gunicorn==21.2.0
 Werkzeug==3.0.1
+requests==2.31.0
