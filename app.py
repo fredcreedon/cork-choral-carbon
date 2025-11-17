@@ -14,6 +14,15 @@ import json
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# European countries with viable train connections
+TRAIN_VIABLE_COUNTRIES = [
+    'austria', 'belgium', 'bulgaria', 'croatia', 'czech', 'denmark', 
+    'estonia', 'finland', 'france', 'germany', 'greece', 'hungary',
+    'ireland', 'italy', 'latvia', 'lithuania', 'luxembourg', 'netherlands',
+    'poland', 'portugal', 'romania', 'slovakia', 'slovenia', 'spain',
+    'sweden', 'uk', 'united kingdom', 'switzerland', 'norway'
+]
+
 # Emission factors (kg CO2 per passenger per km)
 EMISSION_FACTORS = {
     'airplane_short': 0.255,
@@ -77,6 +86,35 @@ class TravelAnalyzer:
         self.team_name = team_name
         self.num_people = num_people
         self.journeys = journeys
+    
+    def is_in_europe(self, location):
+        """Check if location is in train-viable European countries"""
+        location_lower = location.lower()
+        return any(country in location_lower for country in TRAIN_VIABLE_COUNTRIES)
+    
+    def get_optimal_transport(self, distance, start, end, current_mode):
+        """Determine optimal transport mode for a journey"""
+        # If already using optimal mode for distance, keep it
+        if 'festival bus' in current_mode.lower() or 'coach' in current_mode.lower():
+            if distance < 500:  # Short distance, bus is optimal
+                return current_mode, None
+        
+        # Check if train is viable for flights
+        if 'airplane' in current_mode.lower() or 'flight' in current_mode.lower():
+            start_europe = self.is_in_europe(start)
+            end_europe = self.is_in_europe(end)
+            
+            if start_europe and end_europe:
+                if distance < 1000:
+                    return 'train', 'Train connection likely available - research route options'
+                elif distance < 2000:
+                    return 'train', 'Multi-leg train journey possible via major hubs (research required)'
+        
+        # For ground transport, festival bus is optimal
+        if distance > 5:  # Don't suggest bus for very short walks
+            return 'festival bus', 'Most efficient option for this distance'
+        
+        return current_mode, None
         
     def estimate_distance(self, start, end):
         """Estimate distance between two locations using Nominatim geocoding and OSRM routing"""
@@ -198,141 +236,152 @@ class TravelAnalyzer:
         return distance * factor
     
     def generate_scenarios(self):
-        """Generate optimisation scenarios with specific, actionable recommendations"""
+        """Generate Your Trip vs Optimised Trip comparison with efficiency rating"""
         df = pd.DataFrame(self.journeys)
         current_emissions = df['total_emissions'].sum()
         
-        # Analyze current transport breakdown
-        ground_journeys = df[~df['transport_mode'].str.lower().str.contains('airplane|flight')]
-        flight_journeys = df[df['transport_mode'].str.lower().str.contains('airplane|flight')]
+        # Build optimised scenario
+        optimised_journeys = []
+        optimisation_notes = []
         
-        ground_emissions = ground_journeys['total_emissions'].sum() if len(ground_journeys) > 0 else 0
-        flight_emissions = flight_journeys['total_emissions'].sum() if len(flight_journeys) > 0 else 0
+        for journey in self.journeys:
+            optimal_mode, note = self.get_optimal_transport(
+                journey['distance'],
+                journey['start_point'],
+                journey['arrival_point'],
+                journey['transport_mode']
+            )
+            
+            # Calculate optimal emissions
+            optimal_emissions_per_person = self.calculate_emissions(journey['distance'], optimal_mode)
+            optimal_total = optimal_emissions_per_person * self.num_people
+            
+            optimised_journeys.append({
+                **journey,
+                'optimal_mode': optimal_mode,
+                'optimal_emissions': optimal_total,
+                'note': note
+            })
+            
+            if note and journey['transport_mode'].lower() != optimal_mode.lower():
+                optimisation_notes.append({
+                    'journey': f"{journey['start_point']} → {journey['arrival_point']}",
+                    'current': journey['transport_mode'],
+                    'optimal': optimal_mode,
+                    'note': note,
+                    'saving': journey['total_emissions'] - optimal_total
+                })
         
-        # GREEN SCENARIO: Maximum use of festival buses
-        green_df = df.copy()
-        for idx, row in green_df.iterrows():
-            if 'airplane' not in row['transport_mode'].lower():
-                # Switch all ground transport to festival buses
-                new_emissions = row['distance'] * EMISSION_FACTORS['bus_coach'] * self.num_people
-                green_df.at[idx, 'total_emissions'] = new_emissions
-        green_emissions = green_df['total_emissions'].sum()
-        green_ground_savings = ground_emissions - (green_emissions - flight_emissions)
+        optimised_emissions = sum(j['optimal_emissions'] for j in optimised_journeys)
         
-        # FLEXIBLE SCENARIO: Mix of cars and private transport
-        flex_df = df.copy()
-        for idx, row in flex_df.iterrows():
-            if 'airplane' not in row['transport_mode'].lower():
-                # Use cars instead of buses (higher emissions but more flexibility)
-                new_emissions = row['distance'] * EMISSION_FACTORS['car'] * self.num_people
-                flex_df.at[idx, 'total_emissions'] = new_emissions
-        flex_emissions = flex_df['total_emissions'].sum()
+        # Calculate efficiency rating
+        if optimised_emissions > 0:
+            efficiency_score = (optimised_emissions / current_emissions) * 100
+        else:
+            efficiency_score = 100
         
-        # BALANCED SCENARIO: Strategic mix
-        balanced_df = df.copy()
-        for idx, row in balanced_df.iterrows():
-            if 'airplane' not in row['transport_mode'].lower():
-                # Use festival bus for main transfers, keep current for others
-                if row['distance'] > 10:  # Longer journeys use festival bus
-                    new_emissions = row['distance'] * EMISSION_FACTORS['bus_coach'] * self.num_people
-                else:  # Short journeys keep current arrangement
-                    new_emissions = row['total_emissions']
-                balanced_df.at[idx, 'total_emissions'] = new_emissions
-        balanced_emissions = balanced_df['total_emissions'].sum()
+        # Determine rating band
+        if efficiency_score >= 95:
+            rating = 'A+++'
+            rating_label = 'Outstanding'
+            rating_color = '#2ecc71'
+        elif efficiency_score >= 85:
+            rating = 'A'
+            rating_label = 'Excellent'
+            rating_color = '#27ae60'
+        elif efficiency_score >= 70:
+            rating = 'B'
+            rating_label = 'Good'
+            rating_color = '#f39c12'
+        elif efficiency_score >= 50:
+            rating = 'C'
+            rating_label = 'Moderate'
+            rating_color = '#e67e22'
+        elif efficiency_score >= 30:
+            rating = 'D'
+            rating_label = 'Below Optimal'
+            rating_color = '#e74c3c'
+        else:
+            rating = 'E'
+            rating_label = 'High Impact'
+            rating_color = '#c0392b'
+        
+        # Build what worked well list
+        good_choices = []
+        improvements = []
+        
+        for note in optimisation_notes:
+            if note['saving'] > 0:
+                improvements.append(f"Switch {note['journey']} from {note['current']} to {note['optimal']} (saves {note['saving']:.0f} kg CO₂)")
+                if note['note']:
+                    improvements.append(f"  → {note['note']}")
+        
+        # Identify what they did well
+        festival_bus_count = sum(1 for j in self.journeys if 'festival' in j['transport_mode'].lower() or 'coach' in j['transport_mode'].lower())
+        if festival_bus_count > 0:
+            good_choices.append(f"Used festival buses/coaches for {festival_bus_count} journey(s)")
+        
+        train_count = sum(1 for j in self.journeys if 'train' in j['transport_mode'].lower())
+        if train_count > 0:
+            good_choices.append(f"Chose train for {train_count} journey(s)")
+        
+        if not improvements:
+            good_choices.append("Already using optimal transport for all journeys!")
         
         scenarios = {
-            'current': {
-                'name': 'Current Plan',
+            'your_trip': {
+                'name': 'Your Actual Trip',
                 'emissions': current_emissions,
                 'emissions_per_person': current_emissions / self.num_people,
-                'saving': 0,
-                'saving_pct': 0,
-                'cost_index': 100,
-                'convenience': 100,
-                'description': 'Your current travel arrangements',
-                'actions': [
-                    f"Continue with current plans",
-                    f"Total emissions: {current_emissions:.0f} kg CO₂",
-                    f"Flights account for {(flight_emissions/current_emissions*100):.0f}% of emissions" if flight_emissions > 0 else "No flight emissions",
-                    f"Ground transport: {(ground_emissions/current_emissions*100):.0f}% of emissions" if ground_emissions > 0 else "No ground transport emissions"
-                ]
+                'description': f'The carbon footprint of your actual travel arrangements',
+                'journeys': self.journeys
             },
-            'green': {
-                'name': 'Green Option',
-                'emissions': green_emissions,
-                'emissions_per_person': green_emissions / self.num_people,
-                'saving': current_emissions - green_emissions,
-                'saving_pct': ((current_emissions - green_emissions) / current_emissions * 100),
-                'cost_index': 85,
-                'convenience': 90,
-                'description': 'Use festival buses for ALL ground transport (airport, venues, hotels)',
-                'actions': [
-                    f"SPECIFIC CHANGES: Replace all private cars, taxis, and public buses with festival coaches",
-                    f"Contact festival coordinator to book {len(ground_journeys)} bus journeys for your {self.num_people} people",
-                    f"Share your performance schedule to align with bus timetable",
-                    f"Saves {green_ground_savings:.0f} kg CO₂ on ground transport ({(green_ground_savings/ground_emissions*100):.0f}% reduction)" if ground_emissions > 0 else "Optimizes ground transport",
-                    f"Estimated cost saving: 15% (shared coach vs multiple vehicles)"
-                ]
+            'optimised': {
+                'name': 'Optimised Plan',
+                'emissions': optimised_emissions,
+                'emissions_per_person': optimised_emissions / self.num_people,
+                'description': 'Absolute lowest carbon scenario using best available transport',
+                'journeys': optimised_journeys,
+                'notes': optimisation_notes
             },
-            'flexible': {
-                'name': 'Flexible Option',
-                'emissions': flex_emissions,
-                'emissions_per_person': flex_emissions / self.num_people,
-                'saving': current_emissions - flex_emissions,
-                'saving_pct': ((current_emissions - flex_emissions) / current_emissions * 100),
-                'cost_index': 140,
-                'convenience': 110,
-                'description': 'Use private cars/taxis for maximum scheduling freedom',
-                'actions': [
-                    f"SPECIFIC CHANGES: Book {max(1, self.num_people // 4)} hire cars or use taxi services",
-                    f"Allows independent arrival/departure times for different groups",
-                    f"No dependency on festival bus schedules - full flexibility",
-                    f"Additional cost: ~40% more than festival buses",
-                    f"Additional emissions: {abs(current_emissions - flex_emissions):.0f} kg CO₂ ({abs((current_emissions - flex_emissions)/current_emissions*100):.0f}% increase)" if flex_emissions > current_emissions else "Similar emissions to current plan"
-                ]
-            },
-            'balanced': {
-                'name': 'Balanced Approach',
-                'emissions': balanced_emissions,
-                'emissions_per_person': balanced_emissions / self.num_people,
-                'saving': current_emissions - balanced_emissions,
-                'saving_pct': ((current_emissions - balanced_emissions) / current_emissions * 100),
-                'cost_index': 92,
-                'convenience': 98,
-                'description': 'Festival buses for main transfers, flexible transport for early/late events',
-                'actions': [
-                    f"SPECIFIC CHANGES: Use festival buses for {len([j for j in self.journeys if j['distance'] > 10])} long-distance trips (airport, main venues)",
-                    f"Keep taxi/car flexibility for {len([j for j in self.journeys if j['distance'] <= 10])} short local trips (late performances, small venues)",
-                    f"Book 1-2 backup taxis for emergencies or schedule conflicts",
-                    f"Saves {(current_emissions - balanced_emissions):.0f} kg CO₂ while maintaining schedule flexibility",
-                    f"Cost increase: ~8% more than green option, but 32% cheaper than all-private transport"
-                ]
+            'efficiency': {
+                'score': efficiency_score,
+                'rating': rating,
+                'rating_label': rating_label,
+                'rating_color': rating_color,
+                'savings_potential': current_emissions - optimised_emissions,
+                'savings_pct': ((current_emissions - optimised_emissions) / current_emissions * 100) if current_emissions > 0 else 0,
+                'good_choices': good_choices,
+                'improvements': improvements[:5]  # Limit to top 5
             }
         }
         
         return scenarios
+        return scenarios
     
-    def create_comparison_chart(self, scenario_key):
-        """Create simplified comparison chart for a specific scenario"""
+    def create_comparison_chart(self):
+        """Create comparison chart showing Your Trip vs Optimised Plan"""
         scenarios = self.generate_scenarios()
-        current = scenarios['current']
-        comparison = scenarios[scenario_key]
+        your_trip = scenarios['your_trip']
+        optimised = scenarios['optimised']
+        efficiency = scenarios['efficiency']
         
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
         
-        # Chart 1: Emissions comparison
-        categories = ['Current Plan', comparison['name']]
-        emissions = [current['emissions'], comparison['emissions']]
-        colors = ['#3498db', '#2ecc71' if comparison['saving'] > 0 else '#e74c3c']
+        # Chart 1: Total emissions comparison
+        categories = ['Your Actual Trip', 'Optimised Plan']
+        emissions = [your_trip['emissions'], optimised['emissions']]
+        colors = ['#3498db', '#2ecc71']
         
         bars = ax1.bar(categories, emissions, color=colors, alpha=0.8, 
                       edgecolor='black', linewidth=2)
         ax1.set_ylabel('Total CO₂ Emissions (kg)', fontsize=12, fontweight='bold')
         
-        if comparison['saving'] > 0:
-            title = f"Reduces emissions by {comparison['saving']:.0f} kg ({comparison['saving_pct']:.0f}%)"
+        savings = your_trip['emissions'] - optimised['emissions']
+        if savings > 0:
+            title = f"Potential savings: {savings:.0f} kg ({efficiency['savings_pct']:.0f}%)"
         else:
-            title = f"Increases emissions by {abs(comparison['saving']):.0f} kg ({abs(comparison['saving_pct']):.0f}%)"
+            title = "Already at optimal efficiency!"
         ax1.set_title(title, fontsize=13, fontweight='bold', pad=15)
         ax1.grid(axis='y', alpha=0.3, linestyle='--')
         
@@ -343,12 +392,13 @@ class TravelAnalyzer:
                     f'{emission:.0f} kg',
                     ha='center', va='bottom', fontsize=11, fontweight='bold')
         
-        # Chart 2: Per person comparison
-        per_person = [current['emissions_per_person'], comparison['emissions_per_person']]
+        # Chart 2: Per person comparison with efficiency rating
+        per_person = [your_trip['emissions_per_person'], optimised['emissions_per_person']]
         bars2 = ax2.bar(categories, per_person, color=colors, alpha=0.8,
                        edgecolor='black', linewidth=2)
         ax2.set_ylabel('CO₂ Emissions per Person (kg)', fontsize=12, fontweight='bold')
-        ax2.set_title('Per Person Impact', fontsize=13, fontweight='bold', pad=15)
+        ax2.set_title(f'Efficiency Rating: {efficiency["rating"]} ({efficiency["rating_label"]})', 
+                     fontsize=13, fontweight='bold', pad=15, color=efficiency['rating_color'])
         ax2.grid(axis='y', alpha=0.3, linestyle='--')
         
         # Add value labels
@@ -358,7 +408,7 @@ class TravelAnalyzer:
                     f'{emission:.1f} kg',
                     ha='center', va='bottom', fontsize=11, fontweight='bold')
         
-        plt.suptitle(f'{self.team_name}: {comparison["name"]} vs Current Plan',
+        plt.suptitle(f'{self.team_name}: Carbon Efficiency Analysis',
                     fontsize=14, fontweight='bold')
         plt.tight_layout()
         
@@ -418,10 +468,8 @@ def analyze():
         analyzer = TravelAnalyzer(team_name, num_people, journeys)
         scenarios = analyzer.generate_scenarios()
         
-        # Generate comparison charts
-        charts = {}
-        for scenario_key in ['green', 'flexible', 'balanced']:
-            charts[scenario_key] = analyzer.create_comparison_chart(scenario_key)
+        # Generate single comparison chart
+        chart = analyzer.create_comparison_chart()
         
         # Calculate summary stats
         total_emissions = sum(j['total_emissions'] for j in journeys)
@@ -439,7 +487,7 @@ def analyze():
                 'trees_needed': round(total_emissions / 21, 0)
             },
             'scenarios': scenarios,
-            'charts': charts
+            'chart': chart
         })
         
     except Exception as e:
