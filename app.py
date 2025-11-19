@@ -566,6 +566,86 @@ def upload_file():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
+@app.route('/generate-pdf', methods=['POST'])
+def generate_pdf():
+    try:
+        from weasyprint import HTML
+        from datetime import datetime
+        
+        data = request.json
+        
+        # Prepare template data
+        scenarios = data.get('scenarios', {})
+        summary = data.get('summary', {})
+        chart_base64 = data.get('chart', '')
+        
+        efficiency = scenarios.get('efficiency', {})
+        your_trip = scenarios.get('your_trip', {})
+        
+        # Calculate percentages
+        total = summary.get('total_emissions', 0)
+        unavoidable = efficiency.get('unavoidable', 0)
+        controllable_current = efficiency.get('controllable_current', 0)
+        
+        unavoidable_pct = (unavoidable / total * 100) if total > 0 else 0
+        controllable_pct = (controllable_current / total * 100) if total > 0 else 0
+        
+        template_data = {
+            'team_name': summary.get('team_name', 'Team'),
+            'num_people': summary.get('num_people', 0),
+            'generation_date': datetime.now().strftime('%d %B %Y'),
+            'total_distance': round(summary.get('total_distance', 0), 1),
+            'journey_count': len(your_trip.get('journeys', [])),
+            
+            # Efficiency metrics
+            'efficiency_score': round(efficiency.get('score', 0)),
+            'efficiency_grade': efficiency.get('rating', '-'),
+            'efficiency_label': efficiency.get('rating_label', 'Unknown'),
+            'efficiency_color': efficiency.get('rating_color', '#666'),
+            
+            # Emission metrics
+            'total_emissions': round(summary.get('total_emissions', 0), 1),
+            'per_person_emissions': round(summary.get('emissions_per_person', 0), 1),
+            'car_equivalent': summary.get('car_equivalent', 0),
+            'trees_needed': summary.get('trees_needed', 0),
+            
+            # Breakdown
+            'unavoidable_emissions': round(unavoidable, 1),
+            'unavoidable_pct': round(unavoidable_pct),
+            'controllable_emissions': round(controllable_current, 1),
+            'controllable_pct': round(controllable_pct),
+            'savings_potential': round(efficiency.get('savings_potential', 0), 1),
+            
+            # Journeys
+            'journeys': your_trip.get('journeys', []),
+            
+            # Chart
+            'chart_base64': chart_base64,
+            
+            # Recommendations
+            'good_choices': efficiency.get('good_choices', []),
+            'improvements': efficiency.get('improvements', [])
+        }
+        
+        # Render HTML template
+        html_content = render_template('report_template.html', **template_data)
+        
+        # Generate PDF
+        pdf = HTML(string=html_content).write_pdf()
+        
+        # Create response
+        response = send_file(
+            io.BytesIO(pdf),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'carbon_report_{template_data["team_name"].replace(" ", "_")}.pdf'
+        )
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
 if __name__ == '__main__':
     # Support deployment platforms (Render, Railway, etc.)
     port = int(os.environ.get('PORT', 5000))
