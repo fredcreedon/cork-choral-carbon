@@ -644,7 +644,10 @@ def generate_pdf():
         return response
         
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"PDF Generation Error: {error_detail}")
+        return jsonify({'success': False, 'error': f'PDF generation failed: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Support deployment platforms (Render, Railway, etc.)
