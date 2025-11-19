@@ -94,26 +94,46 @@ class TravelAnalyzer:
     
     def get_optimal_transport(self, distance, start, end, current_mode):
         """Determine optimal transport mode for a journey"""
-        # If already using optimal mode for distance, keep it
-        if 'festival bus' in current_mode.lower() or 'coach' in current_mode.lower():
-            if distance < 500:  # Short distance, bus is optimal
-                return current_mode, None
         
-        # Check if train is viable for flights
+        # If it's a flight, check if it's truly unavoidable
         if 'airplane' in current_mode.lower() or 'flight' in current_mode.lower():
             start_europe = self.is_in_europe(start)
             end_europe = self.is_in_europe(end)
             
-            if start_europe and end_europe:
-                if distance < 1000:
-                    return 'train', 'Train connection likely available - research route options'
-                elif distance < 2000:
-                    return 'train', 'Multi-leg train journey possible via major hubs (research required)'
+            # Check for water crossings (UK/Ireland to/from mainland Europe)
+            uk_ireland = ['uk', 'united kingdom', 'ireland', 'cork', 'dublin', 'belfast']
+            mainland_europe = ['spain', 'france', 'germany', 'italy', 'portugal', 'netherlands', 
+                              'belgium', 'austria', 'poland', 'czech', 'denmark', 'sweden']
+            
+            start_is_uk_ireland = any(place in start.lower() for place in uk_ireland)
+            end_is_uk_ireland = any(place in end.lower() for place in uk_ireland)
+            start_is_mainland = any(place in start.lower() for place in mainland_europe)
+            end_is_mainland = any(place in end.lower() for place in mainland_europe)
+            
+            # Flight unavoidable if crossing water
+            if (start_is_uk_ireland and end_is_mainland) or (start_is_mainland and end_is_uk_ireland):
+                return current_mode, None  # Keep flight, no alternative
+            
+            # Flight unavoidable if very long distance (>1500km)
+            if distance > 1500:
+                return current_mode, None
+            
+            # For shorter European flights that don't cross water, train might be viable
+            if start_europe and end_europe and distance < 1000:
+                return 'train', 'Train connection may be available for this route - research options'
+            elif start_europe and end_europe and distance < 1500:
+                return 'train', 'Multi-leg train journey possible via major hubs (requires research)'
+            else:
+                return current_mode, None  # Keep flight
         
-        # For ground transport, festival bus is optimal
-        if distance > 5:  # Don't suggest bus for very short walks
-            return 'festival bus', 'Most efficient option for this distance'
+        # For ground transport, optimize to festival bus if distance > 5km
+        if distance > 5:
+            if 'festival' in current_mode.lower() or 'coach' in current_mode.lower():
+                return current_mode, None  # Already optimal
+            else:
+                return 'festival bus', 'Most efficient option for this distance'
         
+        # Very short distances - current mode is fine
         return current_mode, None
         
     def estimate_distance(self, start, end):
@@ -233,9 +253,32 @@ class TravelAnalyzer:
         
         optimised_emissions = sum(j['optimal_emissions'] for j in optimised_journeys)
         
-        # Calculate efficiency rating
-        if optimised_emissions > 0:
-            efficiency_score = (optimised_emissions / current_emissions) * 100
+        # Separate controllable vs uncontrollable emissions
+        current_controllable = 0
+        optimised_controllable = 0
+        unavoidable_emissions = 0
+        
+        for i, journey in enumerate(self.journeys):
+            optimal_journey = optimised_journeys[i]
+            
+            # If both current and optimal are flights, it's unavoidable
+            current_is_flight = 'airplane' in journey['transport_mode'].lower() or 'flight' in journey['transport_mode'].lower()
+            optimal_is_flight = 'airplane' in optimal_journey['optimal_mode'].lower() or 'flight' in optimal_journey['optimal_mode'].lower()
+            
+            if current_is_flight and optimal_is_flight:
+                # Unavoidable flight
+                unavoidable_emissions += journey['total_emissions']
+            else:
+                # Controllable transport choice
+                current_controllable += journey['total_emissions']
+                optimised_controllable += optimal_journey['optimal_emissions']
+        
+        # Calculate efficiency rating based on CONTROLLABLE emissions only
+        if current_controllable > 0 and optimised_controllable > 0:
+            efficiency_score = (optimised_controllable / current_controllable) * 100
+        elif current_controllable == 0:
+            # All flights, no controllable emissions
+            efficiency_score = 100  # Perfect score - nothing they could control
         else:
             efficiency_score = 100
         
@@ -270,10 +313,16 @@ class TravelAnalyzer:
         improvements = []
         
         for note in optimisation_notes:
+            # Only suggest improvements that are realistic (not replacing flights with buses)
             if note['saving'] > 0:
-                improvements.append(f"Switch {note['journey']} from {note['current']} to {note['optimal']} (saves {note['saving']:.0f} kg CO₂)")
-                if note['note']:
-                    improvements.append(f"  → {note['note']}")
+                # Skip if trying to replace flight with ground transport (impossible)
+                current_is_flight = 'airplane' in note['current'].lower() or 'flight' in note['current'].lower()
+                optimal_is_ground = 'bus' in note['optimal'].lower() or 'car' in note['optimal'].lower()
+                
+                if not (current_is_flight and optimal_is_ground):
+                    improvements.append(f"Switch {note['journey']} from {note['current']} to {note['optimal']} (saves {note['saving']:.0f} kg CO₂)")
+                    if note['note']:
+                        improvements.append(f"  → {note['note']}")
         
         # Identify what they did well
         festival_bus_count = sum(1 for j in self.journeys if 'festival' in j['transport_mode'].lower() or 'coach' in j['transport_mode'].lower())
@@ -284,8 +333,15 @@ class TravelAnalyzer:
         if train_count > 0:
             good_choices.append(f"Chose train for {train_count} journey(s)")
         
+        # Check if they used unavoidable flights appropriately
+        unavoidable_flight_count = sum(1 for j in optimised_journeys 
+                                       if 'airplane' in j['optimal_mode'].lower() 
+                                       and 'airplane' in j.get('transport_mode', '').lower())
+        if unavoidable_flight_count > 0:
+            good_choices.append(f"Used flights appropriately for {unavoidable_flight_count} unavoidable long-distance/water-crossing journey(s)")
+        
         if not improvements:
-            good_choices.append("Already using optimal transport for all journeys!")
+            good_choices.append("Already using optimal transport for all controllable journeys!")
         
         scenarios = {
             'your_trip': {
@@ -310,12 +366,14 @@ class TravelAnalyzer:
                 'rating_color': rating_color,
                 'savings_potential': current_emissions - optimised_emissions,
                 'savings_pct': ((current_emissions - optimised_emissions) / current_emissions * 100) if current_emissions > 0 else 0,
+                'controllable_current': current_controllable,
+                'controllable_optimal': optimised_controllable,
+                'unavoidable': unavoidable_emissions,
                 'good_choices': good_choices,
                 'improvements': improvements[:5]  # Limit to top 5
             }
         }
         
-        return scenarios
         return scenarios
     
     def create_comparison_chart(self):
