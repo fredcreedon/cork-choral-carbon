@@ -342,9 +342,20 @@
             
             // Update efficiency explanation
             if (efficiency.savings_potential > 0) {
-                document.getElementById('efficiency-text').innerHTML = 
-                    `You operated at <strong>${efficiency.score.toFixed(0)}%</strong> of optimal efficiency. ` +
-                    `With better transport choices, you could have saved <strong>${efficiency.savings_potential.toFixed(0)} kg CO₂</strong>.`;
+                let explanationText = `You operated at <strong>${efficiency.score.toFixed(0)}%</strong> of optimal efficiency. `;
+                
+                if (efficiency.unavoidable && efficiency.unavoidable > 0) {
+                    const unavoidablePct = (efficiency.unavoidable / data.summary.total_emissions * 100).toFixed(0);
+                    explanationText += `<br><br>📊 <strong>Emissions Breakdown:</strong><br>`;
+                    explanationText += `• Unavoidable (long-distance flights): ${efficiency.unavoidable.toFixed(0)} kg CO₂ (${unavoidablePct}%)<br>`;
+                    explanationText += `• Controllable (ground transport): ${efficiency.controllable_current.toFixed(0)} kg CO₂<br>`;
+                    explanationText += `• With better choices: ${efficiency.controllable_optimal.toFixed(0)} kg CO₂<br>`;
+                    explanationText += `<br>💡 You could save <strong>${(efficiency.controllable_current - efficiency.controllable_optimal).toFixed(0)} kg CO₂</strong> by optimizing ground transport.`;
+                } else {
+                    explanationText += `With better transport choices, you could have saved <strong>${efficiency.savings_potential.toFixed(0)} kg CO₂</strong>.`;
+                }
+                
+                document.getElementById('efficiency-text').innerHTML = explanationText;
             } else {
                 document.getElementById('efficiency-text').innerHTML = 
                     `Outstanding! You operated at <strong>${efficiency.score.toFixed(0)}%</strong> efficiency. ` +
