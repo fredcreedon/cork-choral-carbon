@@ -569,79 +569,151 @@ def upload_file():
 @app.route('/generate-pdf', methods=['POST'])
 def generate_pdf():
     try:
-        from weasyprint import HTML
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
         from datetime import datetime
+        import io
         
-        data = request.json
+        # Create PDF in memory
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
         
-        # Prepare template data
-        scenarios = data.get('scenarios', {})
-        summary = data.get('summary', {})
-        chart_base64 = data.get('chart', '')
+        # Container for elements
+        elements = []
+        styles = getSampleStyleSheet()
         
-        efficiency = scenarios.get('efficiency', {})
-        your_trip = scenarios.get('your_trip', {})
-        
-        # Calculate percentages
-        total = summary.get('total_emissions', 0)
-        unavoidable = efficiency.get('unavoidable', 0)
-        controllable_current = efficiency.get('controllable_current', 0)
-        
-        unavoidable_pct = (unavoidable / total * 100) if total > 0 else 0
-        controllable_pct = (controllable_current / total * 100) if total > 0 else 0
-        
-        template_data = {
-            'team_name': summary.get('team_name', 'Team'),
-            'num_people': summary.get('num_people', 0),
-            'generation_date': datetime.now().strftime('%d %B %Y'),
-            'total_distance': round(summary.get('total_distance', 0), 1),
-            'journey_count': len(your_trip.get('journeys', [])),
-            
-            # Efficiency metrics
-            'efficiency_score': round(efficiency.get('score', 0)),
-            'efficiency_grade': efficiency.get('rating', '-'),
-            'efficiency_label': efficiency.get('rating_label', 'Unknown'),
-            'efficiency_color': efficiency.get('rating_color', '#666'),
-            
-            # Emission metrics
-            'total_emissions': round(summary.get('total_emissions', 0), 1),
-            'per_person_emissions': round(summary.get('emissions_per_person', 0), 1),
-            'car_equivalent': summary.get('car_equivalent', 0),
-            'trees_needed': summary.get('trees_needed', 0),
-            
-            # Breakdown
-            'unavoidable_emissions': round(unavoidable, 1),
-            'unavoidable_pct': round(unavoidable_pct),
-            'controllable_emissions': round(controllable_current, 1),
-            'controllable_pct': round(controllable_pct),
-            'savings_potential': round(efficiency.get('savings_potential', 0), 1),
-            
-            # Journeys
-            'journeys': your_trip.get('journeys', []),
-            
-            # Chart
-            'chart_base64': chart_base64,
-            
-            # Recommendations
-            'good_choices': efficiency.get('good_choices', []),
-            'improvements': efficiency.get('improvements', [])
-        }
-        
-        # Render HTML template
-        html_content = render_template('report_template.html', **template_data)
-        
-        # Generate PDF
-        pdf = HTML(string=html_content).write_pdf()
-        
-        # Create response
-        response = send_file(
-            io.BytesIO(pdf),
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=f'carbon_report_{template_data["team_name"].replace(" ", "_")}.pdf'
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#667eea'),
+            spaceAfter=30,
+            alignment=TA_CENTER
         )
         
-        return response
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#667eea'),
+            spaceAfter=12,
+            spaceBefore=20
+        )
+        
+        # Title
+        elements.append(Paragraph("🌍 Carbon Footprint Report", title_style))
+        elements.append(Paragraph("Cork Choral Festival 2025", styles['Normal']))
+        elements.append(Paragraph(f"Generated: {datetime.now().strftime('%d %B %Y')}", styles['Normal']))
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Demo data
+        elements.append(Paragraph("Efficiency Rating", heading_style))
+        
+        # Big rating box
+        rating_data = [
+            ['EFFICIENCY SCORE', 'RATING'],
+            ['78%', 'B'],
+            ['Good', '']
+        ]
+        rating_table = Table(rating_data, colWidths=[3*inch, 2*inch])
+        rating_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8f9fa')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 1), (-1, 1), 36),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ]))
+        elements.append(rating_table)
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Key metrics
+        elements.append(Paragraph("📊 Key Metrics", heading_style))
+        metrics_data = [
+            ['Metric', 'Value'],
+            ['Total Emissions', '13,203 kg CO₂'],
+            ['Per Person (34 people)', '388 kg CO₂'],
+            ['Car Equivalent', '77,211 km'],
+            ['Trees Needed to Offset', '629 trees']
+        ]
+        metrics_table = Table(metrics_data, colWidths=[3*inch, 2.5*inch])
+        metrics_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')])
+        ]))
+        elements.append(metrics_table)
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Emissions breakdown
+        elements.append(Paragraph("🔍 Emissions Breakdown", heading_style))
+        breakdown_data = [
+            ['Type', 'Amount', 'Percentage'],
+            ['Unavoidable (Flights)', '11,737 kg CO₂', '89%'],
+            ['Controllable (Ground Transport)', '1,466 kg CO₂', '11%'],
+            ['Potential Savings', '520 kg CO₂', '-']
+        ]
+        breakdown_table = Table(breakdown_data, colWidths=[2.5*inch, 2*inch, 1.5*inch])
+        breakdown_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')])
+        ]))
+        elements.append(breakdown_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # What worked well
+        elements.append(Paragraph("✅ What Worked Well", heading_style))
+        elements.append(Paragraph("• Used festival buses/coaches for 6 journey(s)", styles['Normal']))
+        elements.append(Paragraph("• Used flights appropriately for 2 unavoidable long-distance/water-crossing journey(s)", styles['Normal']))
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Future improvements
+        elements.append(Paragraph("🌱 For Future Trips, Consider:", heading_style))
+        elements.append(Paragraph("• Switch remaining taxi/car journeys to festival buses", styles['Normal']))
+        elements.append(Paragraph("• Coordinate arrival times to maximize shared transport", styles['Normal']))
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Footer
+        elements.append(Spacer(1, 0.5*inch))
+        footer_text = f"Generated by Cork Choral Carbon Calculator | {datetime.now().strftime('%d %B %Y')}"
+        elements.append(Paragraph(footer_text, styles['Normal']))
+        elements.append(Paragraph("This demo report shows sample data for Cork International Choral Festival 2025", styles['Italic']))
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get PDF data
+        pdf_data = buffer.getvalue()
+        buffer.close()
+        
+        # Return PDF
+        return send_file(
+            io.BytesIO(pdf_data),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='carbon_report_demo.pdf'
+        )
         
     except Exception as e:
         import traceback
