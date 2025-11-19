@@ -149,7 +149,10 @@
             <div class="card">
                 <h3>💾 Export Results</h3>
                 <button type="button" class="btn-secondary" onclick="window.print()">📄 Print Report</button>
-                <button type="button" class="btn-secondary" onclick="alert('Download feature coming soon!')">📊 Download as PDF</button>
+                <button type="button" class="btn-primary" onclick="downloadPDF()">📊 Download PDF Report</button>
+                <p class="help-text" style="margin-top: 10px; font-size: 0.9em;">
+                    The PDF report is a formal 3-page document suitable as a reference for grant applications.
+                </p>
             </div>
         </div>
 
@@ -462,6 +465,41 @@
             } catch (error) {
                 alert('Error uploading file: ' + error.message);
                 document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        async function downloadPDF() {
+            if (!currentData) {
+                alert('Please calculate emissions first before downloading PDF report');
+                return;
+            }
+
+            try {
+                const response = await fetch('/generate-pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentData)
+                });
+
+                if (!response.ok) {
+                    throw new Error('PDF generation failed');
+                }
+
+                // Get the PDF blob
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `carbon_report_${currentData.summary.team_name.replace(/\s+/g, '_')}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                alert('Error generating PDF: ' + error.message);
             }
         }
     </script>
