@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Carbon Footprint Report - {{ team_name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2c3e50;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .header h1 {
+            font-size: 24pt;
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .header .subtitle {
+            font-size: 14pt;
+            color: #7f8c8d;
+            margin: 5px 0;
+        }
+        
+        .disclaimer {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 10pt;
+        }
+        
+        .disclaimer strong {
+            color: #856404;
+        }
+        
+        .efficiency-badge {
+            text-align: center;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border: 4px solid {{ efficiency_color }};
+            border-radius: 15px;
+            padding: 25px;
+            margin: 25px auto;
+            max-width: 400px;
+        }
+        
+        .efficiency-badge .score {
+            font-size: 48pt;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+        }
+        
+        .efficiency-badge .grade {
+            font-size: 36pt;
+            font-weight: bold;
+            color: {{ efficiency_color }};
+            margin: 10px 0;
+        }
+        
+        .efficiency-badge .label {
+            font-size: 14pt;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 25px 0;
+        }
+        
+        .metric-box {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .metric-box .value {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 5px 0;
+        }
+        
+        .metric-box .label {
+            font-size: 10pt;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .section-title {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin: 30px 0 15px 0;
+        }
+        
+        .journey-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 9pt;
+        }
+        
+        .journey-table th {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        .journey-table td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .journey-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .journey-table .total-row {
+            background: #e8f5e9;
+            font-weight: bold;
+        }
+        
+        .breakdown-box {
+            background: #e8f5e9;
+            border-left: 4px solid #2ecc71;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .breakdown-box.warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        
+        .breakdown-box h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 12pt;
+        }
+        
+        .breakdown-box ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        .breakdown-box li {
+            margin: 5px 0;
+        }
+        
+        .chart-container {
+            text-align: center;
+            margin: 25px 0;
+            page-break-inside: avoid;
+        }
+        
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .methodology {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 9pt;
+        }
+        
+        .methodology h4 {
+            margin: 0 0 10px 0;
+            font-size: 11pt;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 9pt;
+            color: #7f8c8d;
+            border-top: 1px solid #dee2e6;
+            padding-top: 15px;
+            margin-top: 30px;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+        
+        .summary-text {
+            line-height: 1.6;
+            margin: 15px 0;
+        }
+        
+        .good-choices {
+            background: #e8f5e9;
+            border-left: 4px solid #2ecc71;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .good-choices h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .good-choices ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        .improvements {
+            background: #fff3cd;
+            border-left: 4px solid #f39c12;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .improvements h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .improvements ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        .verification-box {
+            background: #fff3cd;
+            border: 2px solid #f39c12;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 10pt;
+        }
+        
+        .verification-box strong {
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <!-- PAGE 1: EXECUTIVE SUMMARY -->
+    <div class="header">
+        <h1>Carbon Footprint Report</h1>
+        <div class="subtitle">{{ team_name }}</div>
+        <div class="subtitle" style="font-size: 11pt; margin-top: 10px;">
+            Generated: {{ generation_date }}<br>
+            Participants: {{ num_people }} | Total Distance: {{ total_distance }} km
+        </div>
+    </div>
+    
+    <div class="disclaimer">
+        <strong>⚠️ AI-Generated Report - Verification Required</strong><br>
+        This report is generated using automated calculations and estimated emission factors. 
+        All figures, assumptions, and recommendations should be independently verified by a qualified 
+        environmental consultant before use in grant applications, official submissions, or public reporting.
+    </div>
+    
+    <div class="efficiency-badge">
+        <div class="score">{{ efficiency_score }}%</div>
+        <div class="grade">{{ efficiency_grade }}</div>
+        <div class="label">{{ efficiency_label }}</div>
+    </div>
+    
+    <div class="metrics-grid">
+        <div class="metric-box">
+            <div class="value">{{ total_emissions }}</div>
+            <div class="label">Total CO₂ Emissions (kg)</div>
+        </div>
+        <div class="metric-box">
+            <div class="value">{{ per_person_emissions }}</div>
+            <div class="label">Per Person (kg CO₂)</div>
+        </div>
+        <div class="metric-box">
+            <div class="value">{{ car_equivalent }}</div>
+            <div class="label">Car Travel Equivalent (km)</div>
+        </div>
+        <div class="metric-box">
+            <div class="value">{{ trees_needed }}</div>
+            <div class="label">Trees for Offset (annual)</div>
+        </div>
+    </div>
+    
+    <div class="section-title">Executive Summary</div>
+    <div class="summary-text">
+        <p>This report documents the carbon footprint for {{ team_name }}'s participation in travel activities 
+        involving {{ num_people }} participants across {{ journey_count }} journey segments, covering a total 
+        distance of {{ total_distance }} km.</p>
+        
+        <p>The total carbon emissions for this activity were <strong>{{ total_emissions }} kg CO₂</strong>, 
+        equivalent to <strong>{{ per_person_emissions }} kg CO₂ per person</strong>. The carbon efficiency rating 
+        of <strong>{{ efficiency_grade }}</strong> ({{ efficiency_label }}) indicates that the group operated at 
+        {{ efficiency_score }}% of optimal efficiency for controllable transport choices.</p>
+        
+        {% if unavoidable_emissions > 0 %}
+        <p>Of the total emissions, <strong>{{ unavoidable_emissions }} kg CO₂ ({{ unavoidable_pct }}%)</strong> 
+        were from unavoidable long-distance flights, while <strong>{{ controllable_emissions }} kg CO₂ 
+        ({{ controllable_pct }}%)</strong> were from controllable ground transport decisions.</p>
+        {% endif %}
+    </div>
+    
+    <div class="page-break"></div>
+    
+    <!-- PAGE 2: DETAILED ANALYSIS -->
+    <div class="header">
+        <h1>Detailed Emissions Analysis</h1>
+        <div class="subtitle">{{ team_name }}</div>
+    </div>
+    
+    <div class="section-title">Journey Breakdown</div>
+    <table class="journey-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Route</th>
+                <th>Transport</th>
+                <th>Distance (km)</th>
+                <th>Emissions (kg CO₂)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for journey in journeys %}
+            <tr>
+                <td>{{ journey.date }}</td>
+                <td>{{ journey.start_point }} → {{ journey.arrival_point }}</td>
+                <td>{{ journey.transport_mode }}</td>
+                <td style="text-align: right;">{{ journey.distance }}</td>
+                <td style="text-align: right;">{{ journey.total_emissions|round(1) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="3"><strong>TOTAL</strong></td>
+                <td style="text-align: right;"><strong>{{ total_distance }}</strong></td>
+                <td style="text-align: right;"><strong>{{ total_emissions }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <div class="section-title">Emissions Comparison</div>
+    <div class="chart-container">
+        <img src="data:image/png;base64,{{ chart_base64 }}" alt="Emissions Comparison Chart">
+    </div>
+    
+    {% if unavoidable_emissions > 0 %}
+    <div class="breakdown-box">
+        <h4>📊 Controllable vs Unavoidable Emissions</h4>
+        <ul>
+            <li><strong>Unavoidable emissions (long-distance flights):</strong> {{ unavoidable_emissions }} kg CO₂ ({{ unavoidable_pct }}%)</li>
+            <li><strong>Controllable emissions (ground transport):</strong> {{ controllable_emissions }} kg CO₂ ({{ controllable_pct }}%)</li>
+            <li><strong>Potential savings from optimization:</strong> {{ savings_potential }} kg CO₂</li>
+        </ul>
+        <p style="margin-top: 10px; font-size: 9pt; color: #666;">
+            Note: The efficiency rating is based on controllable emissions only, as long-distance international 
+            flights are considered unavoidable for this type of cultural exchange activity.
+        </p>
+    </div>
+    {% endif %}
+    
+    <div class="page-break"></div>
+    
+    <!-- PAGE 3: SUSTAINABILITY ASSESSMENT -->
+    <div class="header">
+        <h1>Sustainability Assessment</h1>
+        <div class="subtitle">{{ team_name }}</div>
+    </div>
+    
+    <div class="good-choices">
+        <h4>✅ Positive Environmental Choices</h4>
+        <ul>
+            {% for choice in good_choices %}
+            <li>{{ choice }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    
+    {% if improvements %}
+    <div class="improvements">
+        <h4>🌱 Future Improvement Opportunities</h4>
+        <ul>
+            {% for improvement in improvements %}
+            <li>{{ improvement }}</li>
+            {% endfor %}
+        </ul>
+        <p style="margin-top: 10px; font-size: 9pt; color: #666;">
+            These recommendations are provided as guidance for future events and should be evaluated 
+            based on practical feasibility, cost considerations, and scheduling constraints.
+        </p>
+    </div>
+    {% endif %}
+    
+    <div class="section-title">Contextual Benchmarks</div>
+    <div class="breakdown-box warning">
+        <h4>📈 Comparative Metrics</h4>
+        <ul>
+            <li><strong>Car travel equivalent:</strong> {{ car_equivalent }} km of single-occupancy driving</li>
+            <li><strong>Annual tree absorption:</strong> Approximately {{ trees_needed }} mature trees needed for one year to absorb these emissions</li>
+            <li><strong>Per-person impact:</strong> {{ per_person_emissions }} kg CO₂ per participant</li>
+        </ul>
+    </div>
+    
+    <div class="methodology">
+        <h4>Methodology & Emission Factors</h4>
+        <p><strong>Calculation Approach:</strong> Emissions calculated using distance-based methodology 
+        multiplied by mode-specific emission factors per passenger-kilometre.</p>
+        
+        <p><strong>Emission Factors Used:</strong></p>
+        <ul>
+            <li>Short-haul flights (&lt;1500km): 0.255 kg CO₂/passenger-km</li>
+            <li>Long-haul flights (&gt;1500km): 0.195 kg CO₂/passenger-km</li>
+            <li>Coach/Festival Bus: 0.027 kg CO₂/passenger-km</li>
+            <li>Public Bus: 0.089 kg CO₂/passenger-km</li>
+            <li>Private Car: 0.171 kg CO₂/passenger-km</li>
+            <li>Train: 0.041 kg CO₂/passenger-km</li>
+        </ul>
+        
+        <p><strong>Standards Reference:</strong> Emission factors based on UK Government GHG Conversion Factors 
+        and European Environment Agency guidelines for passenger transport.</p>
+        
+        <p><strong>Scope:</strong> This report covers Scope 3 emissions from participant travel only. 
+        It does not include accommodation, food, venue operations, or other indirect emissions.</p>
+        
+        <p><strong>Assumptions:</strong> Distance estimates use a combination of database lookups and 
+        intelligent pattern matching. Actual travel distances may vary. Group size assumes full occupancy 
+        for shared transport modes.</p>
+    </div>
+    
+    <div class="verification-box">
+        <strong>🔍 Verification Statement</strong><br>
+        This report should be reviewed and verified by a qualified environmental consultant or carbon 
+        accounting professional before submission to funding bodies, regulatory authorities, or for 
+        public disclosure. The calculations, assumptions, and recommendations require independent validation 
+        to ensure accuracy and compliance with relevant reporting standards.
+    </div>
+    
+    <div class="footer">
+        <p>Report generated by Cork Choral Carbon Calculator | {{ generation_date }}</p>
+        <p>This is an automated report - all data should be independently verified</p>
+    </div>
+</body>
+</html>
